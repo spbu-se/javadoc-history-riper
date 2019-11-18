@@ -21,8 +21,7 @@
    например, под Windows `python c:\tools\rip-rep-logs.py -cp https://github.com/albertogoffi/toradocu/commit/`
 4. Если предыдущие пункты выполнены верно, то подождать несколько минут (или часов, зависит от входных данных),
    пока спкрит сканирует историю Git.
-5. Получить на выходе файл `__commits.csv`
-6. Открыть его при помощи Excel (или аналога) и отформатировать, чтобы гиперссылки были гиперссылками, diff были хорошо видны и т.д.
+5. Получить на выходе файл `__commits.xlsx`
 
 <a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/80x15.png" /></a> This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.
 
