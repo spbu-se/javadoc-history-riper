@@ -5,6 +5,7 @@ import shutil
 from typing import List, Set, Tuple, Optional, Any
 import dataclasses
 import enum
+import pandas as pd
 
 # import numba
 import tqdm
@@ -72,12 +73,12 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
         # if has_java_changed and has_javadoc_changed and has_javadoc_tag_changed:
         #     return True, True, True
 
-        if has_javadoc_tag_changed:
-            brief = '\n'.join(
-                l for l, n in zip(patchlines, interesting_line_indices) if n
-            )
-        else:
-            brief = ""
+    if has_javadoc_tag_changed:
+        brief = '\n'.join(
+            l for l, n in zip(patchlines, interesting_line_indices) if n
+        )
+    else:
+        brief = ""
 
     return has_java_changed, has_javadoc_changed, has_javadoc_tag_changed, brief
 
@@ -199,14 +200,14 @@ def calc_stats(args):
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
+    commit_lines = []
+    for c in commits:
+        if c.commit_type in {CommitType.ONLY_JAVADOC_TAGS_EVERYWHERE, CommitType.ONLY_JAVADOC_TAGS_IN_SOME_FILES}:
+            commit_lines.append(c.csv_line(args.commit_prefix))
 
-    print("Writing table with links:")
-    with open("__commits.csv", 'w', newline='', encoding='utf-8') as csvf:
-        cw = csv.writer(csvf, dialect='excel', delimiter=';', quotechar='"', quoting=csv.QUOTE_ALL)
-        for cm in tqdm.tqdm(commits):
-            if cm.commit_type in {CommitType.ONLY_JAVADOC_TAGS_EVERYWHERE, CommitType.ONLY_JAVADOC_TAGS_IN_SOME_FILES}:
-                cw.writerow(cm.csv_line(args.commit_prefix))
-
+    df = pd.DataFrame(commit_lines)
+    with pd.ExcelWriter('__commits.xlsx', engine='openpyxl') as writer:
+        df.to_excel(writer, 'Commits', index_label=False, index=False, header=False)
 
     print("Report")
     print("======")
