@@ -7,7 +7,8 @@ import dataclasses
 import enum
 import pandas as pd
 
-# import numba
+import logging
+import chardet
 import tqdm
 import subprocess
 import re
@@ -100,6 +101,23 @@ class Commit:
     commit_type: CommitType = CommitType.UNKNOWN
     file_statuses: List[Tuple[bool, bool, bool, str]] = None
 
+    @staticmethod
+    def read_file_in_any_encoding(filename: str, comment: str = "") -> str:
+        with open(filename, 'rb') as bf:
+            bts = bf.read()
+        try:
+            return bts.decode('utf-8')
+        except Exception as ude1:
+            logging.warning(f"File: {filename} of {comment} is not in UTF-8: {ude1}")
+            try:
+                return bts.decode(sys.getdefaultencoding())
+            except Exception as ude2:
+                logging.warning(f"File: {filename} of {comment} is not in sys.getdefaultencoding() = {sys.getdefaultencoding()}: {ude2}")
+                # Can't handle more here...
+                enc = chardet.detect(bts)['encoding']
+                logging.warning(f"File: {filename} of {comment} is likely in {enc} encoding")
+                return bts.decode(enc)
+
     def classify(self, tmpdir):
         global _mixed_commits, _only_javadoc_in_some_files_commits, _pure_javadoc_commits
 
@@ -112,11 +130,10 @@ class Commit:
                 '--', f
             ]).decode(sys.getdefaultencoding()).strip()
             try:
-                with open(patchname, 'r', encoding='utf-8') as pfile:
-                    patch = pfile.read()
-                    file_statuses.append(has_java_javadoc_changed(patch))
-            except Exception:
-                print("Skipping bad patch of commit %s in file %s" % (self.sha1, f))
+                patch = self.read_file_in_any_encoding(patchname, f"Commit: {self.sha1}")
+                file_statuses.append(has_java_javadoc_changed(patch))
+            except Exception as e:
+                logging.error("Skipping bad patch of commit %s in file %s due to %s" % (self.sha1, f, e))
                 file_statuses.append((False, False, False, ''))
 
         pure_javadoc_tag_files_count = sum(
@@ -219,6 +236,9 @@ def calc_stats(args):
 
 
 if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
+    logging.getLogger().addHandler(logging.FileHandler('__rip-rep-logs.log'))
+
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-cp', '--commit-prefix', type=str, default="https://github.com/albertogoffi/toradocu/commit/")
     argparser.add_argument('-cl', '--context-lines', type=int, default=3)
