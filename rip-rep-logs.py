@@ -31,6 +31,12 @@ _javadoc_section_marker = re.compile(r'^\s*\*?\s*@(param|return|exception|throw|
 _total_commits: int = 0
 _java_files_commits: int = 0
 
+def only_whitespaces(deleted: str, added: str) -> bool:
+    whitespaces = re.compile(r'\s+')
+    whitespaces.sub('', deleted)
+    whitespaces.sub('', added)
+    return (deleted == added)
+
 # @numba.jit()
 def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bool, bool, str]:
     patchlines = patch.replace('\r', '').split('\n')
@@ -41,6 +47,11 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
 
     has_javadoc_changed = False
     has_java_changed = False
+
+    deleted_lines_javadoc = ''
+    added_lines_javadoc = ''
+    deleted_lines_javadoc_tag = ''
+    added_lines_javadoc_tag = ''
 
     interesting_line_indices: List[bool] = [False] * len(patchlines)
 
@@ -59,21 +70,33 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
             in_javadoc_tag_section = False
         elif  going and in_javadoc and not in_javadoc_tag_section and _javadoc_section_marker.match(l):
             in_javadoc_tag_section = True
-        elif going and l.startswith('+ ') or l.startswith('- '):
+        elif going and (l.startswith('+ ') or l.startswith('- ')):
             if in_javadoc_tag_section:
                 has_javadoc_tag_changed = True
+                if l.startswith('- '):
+                    deleted_lines_javadoc_tag = deleted_lines_javadoc_tag + l[2:]
+                elif l.startswith('+ '):
+                    added_lines_javadoc_tag = added_lines_javadoc_tag + l[2:]
                 # has_javadoc_tag_diffplus |= l.startswith('+ ')
                 # has_javadoc_tag_diffminus |= l.startswith('- ')
                 for zi in range(max(0, ln - linecontext), min(len(patchlines), ln + linecontext) + 1):
                     interesting_line_indices[zi] = True
             elif in_javadoc:
                 has_javadoc_changed = True
+                if l.startswith('- '):
+                    deleted_lines_javadoc = deleted_lines_javadoc + l[2:]
+                elif l.startswith('+ '):
+                    added_lines_javadoc = added_lines_javadoc + l[2:]
             else:
                 has_java_changed = True
 
         # if has_java_changed and has_javadoc_changed and has_javadoc_tag_changed:
         #     return True, True, True
-
+    if only_whitespaces(deleted_lines_javadoc, added_lines_javadoc):
+        has_java_javadoc_changed = False
+    if only_whitespaces(deleted_lines_javadoc_tag, added_lines_javadoc_tag):
+        has_java_javadoc_tag_changed = False
+        
     if has_javadoc_tag_changed:
         brief = '\n'.join(
             l for l, n in zip(patchlines, interesting_line_indices) if n
@@ -102,8 +125,8 @@ class Commit:
     file_statuses: List[Tuple[bool, bool, bool, str]] = None
 
     @staticmethod
-    def read_file_in_any_encoding(filename: str, comment: str = "") -> str:
-        with open(filename, 'rb') as bf:
+    def read_file_in_any_encoding(patch_filename: str, filename: str, comment: str = "") -> str:
+        with open(patch_filename, 'rb') as bf:
             bts = bf.read()
         try:
             return bts.decode('utf-8')
@@ -130,7 +153,7 @@ class Commit:
                 '--', f
             ]).decode(sys.getdefaultencoding()).strip()
             try:
-                patch = self.read_file_in_any_encoding(patchname, f"Commit: {self.sha1}")
+                patch = self.read_file_in_any_encoding(patchname, f, f"Commit: {self.sha1}")
                 file_statuses.append(has_java_javadoc_changed(patch))
             except Exception as e:
                 logging.error("Skipping bad patch of commit %s in file %s due to %s" % (self.sha1, f, e))
