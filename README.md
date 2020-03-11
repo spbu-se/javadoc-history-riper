@@ -11,7 +11,7 @@
 ## Как его инсталлировать?
 
 1. Инсталлировать Python 3.7 (под Windows — см. https://www.python.org/downloads/release/python-375/).
-2. Инсталлировать пакеты (под Windows — `pip install tqdm pandas openpyxl chardet`).
+2. Инсталлировать пакеты (под Windows — `pip install -r requirements.txt`).
 
 ## Как его запускать и получать электронную таблицу?
 

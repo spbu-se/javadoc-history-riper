@@ -195,12 +195,16 @@ class Commit:
         ]
 
 
-def get_commits() -> List[Commit]:
+def get_commits(single_commit: Optional[str] = None) -> List[Commit]:
     global _total_commits
 
-    log = subprocess.check_output([
+    git_cmd = [
+        'git', 'show', '--name-status', single_commit
+    ] if single_commit else [
         'git', 'log', '--name-status', '--all'
-    ]).decode(sys.getdefaultencoding())
+    ]
+
+    log = subprocess.check_output(git_cmd).decode(sys.getdefaultencoding())
     log = log.replace('\r', '')
     loglines = log.split('\n')
     commits = []
@@ -228,8 +232,10 @@ def get_commits() -> List[Commit]:
     release()
     return commits
 
-def calc_stats(args):
-    commits = get_commits()
+def calc_stats(args: argparse.Namespace):
+    commits = get_commits(
+        args.only_commit if 'only_commit' in args else None
+    )
 
     print("Analyzing commits...")
 
@@ -265,5 +271,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-cp', '--commit-prefix', type=str, default="https://github.com/albertogoffi/toradocu/commit/")
     argparser.add_argument('-cl', '--context-lines', type=int, default=3)
+    argparser.add_argument('-oc', '--only-commit', type=str, required=False, help=\
+        "For debug purposes. Only analyse given commit, e.g. 7051049221c9d3b99ff179f167fa09a6e02138ee")
     args = argparser.parse_args()
     calc_stats(args)
