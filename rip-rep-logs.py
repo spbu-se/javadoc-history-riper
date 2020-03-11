@@ -28,6 +28,10 @@ _javadoc_start_marker = re.compile(r'^\s*/\*\*\s*$')
 _javadoc_end_marker = re.compile(r'^\s*\*/\s*$')
 _javadoc_section_marker = re.compile(r'^\s*\*?\s*@(param|return|exception|throw|throws)\s+')
 
+_patch_plus_prefix = re.compile(r'^\+( |\t)')
+_patch_minus_prefix = re.compile(r'^\-( |\t)')
+_patch_plus_minus_prefix = re.compile(r'^(\+|\-)( |\t)')
+
 _total_commits: int = 0
 _java_files_commits: int = 0
 
@@ -70,22 +74,22 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
             in_javadoc_tag_section = False
         elif  going and in_javadoc and not in_javadoc_tag_section and _javadoc_section_marker.match(l):
             in_javadoc_tag_section = True
-        elif going and (l.startswith('+ ') or l.startswith('- ')):
+        elif going and _patch_plus_minus_prefix.match(l):
             if in_javadoc_tag_section:
                 has_javadoc_tag_changed = True
-                if l.startswith('- '):
+                if _patch_minus_prefix.match(l):
                     deleted_lines_javadoc_tag = deleted_lines_javadoc_tag + l[2:]
-                elif l.startswith('+ '):
+                elif _patch_plus_prefix.match(l):
                     added_lines_javadoc_tag = added_lines_javadoc_tag + l[2:]
-                # has_javadoc_tag_diffplus |= l.startswith('+ ')
-                # has_javadoc_tag_diffminus |= l.startswith('- ')
+                # has_javadoc_tag_diffplus |= _patch_plus_prefix.match(l)
+                # has_javadoc_tag_diffminus |= _patch_minus_prefix.match(l)
                 for zi in range(max(0, ln - linecontext), min(len(patchlines), ln + linecontext) + 1):
                     interesting_line_indices[zi] = True
             elif in_javadoc:
                 has_javadoc_changed = True
-                if l.startswith('- '):
+                if _patch_minus_prefix.match(l):
                     deleted_lines_javadoc = deleted_lines_javadoc + l[2:]
-                elif l.startswith('+ '):
+                elif _patch_plus_prefix.match(l):
                     added_lines_javadoc = added_lines_javadoc + l[2:]
             else:
                 has_java_changed = True
