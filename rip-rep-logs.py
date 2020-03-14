@@ -37,9 +37,9 @@ _java_files_commits: int = 0
 
 def only_whitespaces(deleted: str, added: str) -> bool:
     whitespaces = re.compile(r'\s+')
-    whitespaces.sub('', deleted)
-    whitespaces.sub('', added)
-    return (deleted == added)
+    deleted_without_whitspaces = whitespaces.sub('', deleted)
+    added_without_whitespaces = whitespaces.sub('', added)
+    return deleted_without_whitspaces == added_without_whitespaces
 
 # @numba.jit()
 def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bool, bool, str]:
@@ -97,9 +97,9 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
         # if has_java_changed and has_javadoc_changed and has_javadoc_tag_changed:
         #     return True, True, True
     if only_whitespaces(deleted_lines_javadoc, added_lines_javadoc):
-        has_java_javadoc_changed = False
+        has_javadoc_changed = False
     if only_whitespaces(deleted_lines_javadoc_tag, added_lines_javadoc_tag):
-        has_java_javadoc_tag_changed = False
+        has_javadoc_tag_changed = False
         
     if has_javadoc_tag_changed:
         brief = '\n'.join(
