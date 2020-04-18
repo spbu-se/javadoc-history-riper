@@ -26,17 +26,18 @@ _commit_line = re.compile(r'^commit ([0-9a-f]{40})$')
 _src_line = re.compile(r'^M\t((.+)\.java)$')
 _javadoc_start_marker = re.compile(r'^\s*/\*\*\s*$')
 _javadoc_end_marker = re.compile(r'^\s*\*/\s*$')
-_javadoc_section_marker = re.compile(r'^\s*\*?\s*@(param|return|exception|throw|throws)\s+')
+_javadoc_section_marker = re.compile(r'^((\+|\-)( |\t))?\s*\*?\s*@(param|return|exception|throw|throws)\s+')
 
 _patch_plus_prefix = re.compile(r'^\+( |\t)')
 _patch_minus_prefix = re.compile(r'^\-( |\t)')
 _patch_plus_minus_prefix = re.compile(r'^(\+|\-)( |\t)')
+_patch_plus_minus_asterisk_prefix = re.compile(r'^(\+|\-)( |\t)\*\s*$')
 
 _total_commits: int = 0
 _java_files_commits: int = 0
 
 def only_whitespaces(deleted: str, added: str) -> bool:
-    whitespaces = re.compile(r'\s+')
+    whitespaces = re.compile(r'(\s)+')
     deleted_without_whitspaces = whitespaces.sub('', deleted)
     added_without_whitespaces = whitespaces.sub('', added)
     return deleted_without_whitspaces == added_without_whitespaces
@@ -52,10 +53,10 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
     has_javadoc_changed = False
     has_java_changed = False
 
-    deleted_lines_javadoc = ''
-    added_lines_javadoc = ''
-    deleted_lines_javadoc_tag = ''
-    added_lines_javadoc_tag = ''
+    javadoc_lines_before = ''
+    javadoc_lines_after = ''
+    tag_lines_before = ''
+    tag_lines_after = ''
 
     interesting_line_indices: List[bool] = [False] * len(patchlines)
 
@@ -74,13 +75,15 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
             in_javadoc_tag_section = False
         elif  going and in_javadoc and not in_javadoc_tag_section and _javadoc_section_marker.match(l):
             in_javadoc_tag_section = True
-        elif going and _patch_plus_minus_prefix.match(l):
+        if going and _patch_plus_minus_prefix.match(l):
+            if _patch_plus_minus_asterisk_prefix.match(l):
+                continue
             if in_javadoc_tag_section:
                 has_javadoc_tag_changed = True
                 if _patch_minus_prefix.match(l):
-                    deleted_lines_javadoc_tag = deleted_lines_javadoc_tag + l[2:]
+                    tag_lines_before = tag_lines_before + l[2:]
                 elif _patch_plus_prefix.match(l):
-                    added_lines_javadoc_tag = added_lines_javadoc_tag + l[2:]
+                    tag_lines_after = tag_lines_after + l[2:]
                 # has_javadoc_tag_diffplus |= _patch_plus_prefix.match(l)
                 # has_javadoc_tag_diffminus |= _patch_minus_prefix.match(l)
                 for zi in range(max(0, ln - linecontext), min(len(patchlines), ln + linecontext) + 1):
@@ -88,26 +91,32 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
             elif in_javadoc:
                 has_javadoc_changed = True
                 if _patch_minus_prefix.match(l):
-                    deleted_lines_javadoc = deleted_lines_javadoc + l[2:]
+                    javadoc_lines_before = javadoc_lines_before + l[2:]
                 elif _patch_plus_prefix.match(l):
-                    added_lines_javadoc = added_lines_javadoc + l[2:]
+                    javadoc_lines_after = javadoc_lines_after + l[2:]
             else:
                 has_java_changed = True
+        else:
+            if in_javadoc_tag_section:
+                tag_lines_before = tag_lines_before + l[2:]
+                tag_lines_after = tag_lines_after + l[2:]
+            elif in_javadoc:
+                javadoc_lines_before = javadoc_lines_before + l[2:]
+                javadoc_lines_after = javadoc_lines_after + l[2:]
 
         # if has_java_changed and has_javadoc_changed and has_javadoc_tag_changed:
         #     return True, True, True
-    if only_whitespaces(deleted_lines_javadoc, added_lines_javadoc):
+    if only_whitespaces(javadoc_lines_before, javadoc_lines_after):
         has_javadoc_changed = False
-    if only_whitespaces(deleted_lines_javadoc_tag, added_lines_javadoc_tag):
+    if only_whitespaces(tag_lines_before, tag_lines_after):
         has_javadoc_tag_changed = False
         
-    if has_javadoc_tag_changed:
+    if has_javadoc_tag_changed and not has_java_changed:
         brief = '\n'.join(
             l for l, n in zip(patchlines, interesting_line_indices) if n
         )
     else:
         brief = ""
-
     return has_java_changed, has_javadoc_changed, has_javadoc_tag_changed, brief
 
 @enum.unique
