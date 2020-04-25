@@ -273,7 +273,8 @@ def statistics_to_excel():
         try:
             if len(str(cell.value)) > max_length:
                 max_length = len(cell.value)
-        except:
+        except Exception as e:
+            logging.warning(str(e))
             continue
     adjusted_width = (max_length + 2) * 1.2
     worksheet.column_dimensions['A'].width = adjusted_width
