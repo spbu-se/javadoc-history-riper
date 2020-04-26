@@ -34,7 +34,7 @@ _javadoc_section_marker = re.compile(r'^((\+|\-)( |\t))?\s*\*?\s*@(param|return|
 _patch_plus_prefix = re.compile(r'^\+( |\t)')
 _patch_minus_prefix = re.compile(r'^\-( |\t)')
 _patch_plus_minus_prefix = re.compile(r'^(\+|\-)( |\t)')
-_patch_plus_minus_asterisk_prefix = re.compile(r'^(\+|\-)( |\t)\*\s*$')
+_patch_plus_minus_asterisk_prefix = re.compile(r'^(\+|\-)( |\t)*\*\s*$')
 
 _total_commits: int = 0
 _java_files_commits: int = 0
