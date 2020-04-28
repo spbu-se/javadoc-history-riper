@@ -28,7 +28,7 @@ import itertools
 _commit_line = re.compile(r'^commit ([0-9a-f]{40})$')
 _src_line = re.compile(r'^M\t((.+)\.java)$')
 _javadoc_start_marker = re.compile(r'^\s*/\*\*\s*$')
-_javadoc_end_marker = re.compile(r'^\s*\*/\s*$')
+_javadoc_end_marker = re.compile(r'^\s*(\*)?\s*\*/\s*$')
 _javadoc_section_marker = re.compile(r'^((\+|\-)( |\t))?\s*\*?\s*@(param|return|exception|throw|throws)\s+')
 
 _patch_plus_prefix = re.compile(r'^\+( |\t)')
