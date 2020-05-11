@@ -37,7 +37,6 @@ _patch_plus_prefix = re.compile(r'^\+( |\t)')
 _patch_minus_prefix = re.compile(r'^\-( |\t)')
 _patch_plus_minus_prefix = re.compile(r'^(\+|\-)( |\t)')
 _patch_plus_minus_asterisk_prefix = re.compile(r'^(\+|\-)( |\t)*\*\s*$')
-
 _function_headers = re.compile(r'^\s*(@\w+)*\s*(\w|\s|<|>|\?|,)+\((\w|\s|,|\.|\[|\]|<|>|\?)*\)(\w|\s|,)*(\{|\;)')
 whitespaces = re.compile(r'(\s)+')
 
