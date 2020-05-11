@@ -1,4 +1,6 @@
-# Russian / Русский
+# JavaDoc Ripper
+
+Russian ReadMe / Русское описание
 
 ## Что этот скрипт делает?
 
