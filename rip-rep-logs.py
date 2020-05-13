@@ -27,20 +27,23 @@ import itertools
 
 _commit_line = re.compile(r'^commit ([0-9a-f]{40})$')
 _src_line = re.compile(r'^M\t((.+)\.java)$')
-_javadoc_start_marker = re.compile(r'^\s*/\*\*\s*$')
-_javadoc_end_marker = re.compile(r'^\s*(\*)?\s*\*/\s*$')
-_javadoc_section_marker = re.compile(r'^((\+|\-)( |\t))?\s*\*?\s*@(param|return|exception|throw|throws)\s+')
+_javadoc_start_marker = re.compile(r'^((\+|\-)( |\t))?\s*/\*\*\s*')
+#_javadoc_end_marker = re.compile(r'^((\+|\-)( |\t))?\s*(\*)?\s*\*/\s*$')
+_javadoc_end_marker = re.compile(r'^.*(\*/|\*\s*\*/)\s*$')
+_javadoc_section_marker = re.compile(r'^((\+|\-)( |\t))?\s*(\*|/\*\*)?\s*@(param|return|exception|throw|throws)\s+')
+_annotation = re.compile(r'^((\+|\-)( |\t))?\s*@\w+\s*')
 
 _patch_plus_prefix = re.compile(r'^\+( |\t)')
 _patch_minus_prefix = re.compile(r'^\-( |\t)')
 _patch_plus_minus_prefix = re.compile(r'^(\+|\-)( |\t)')
 _patch_plus_minus_asterisk_prefix = re.compile(r'^(\+|\-)( |\t)*\*\s*$')
+_function_headers = re.compile(r'^\s*(@\w+)*\s*(\w|\s|<|>|\?|,)+\((\w|\s|,|\.|\[|\]|<|>|\?)*\)(\w|\s|,)*(\{|\;)')
+whitespaces = re.compile(r'(\s)+')
 
 _total_commits: int = 0
 _java_files_commits: int = 0
 
 def only_whitespaces(deleted: str, added: str) -> bool:
-    whitespaces = re.compile(r'(\s)+')
     deleted_without_whitspaces = whitespaces.sub('', deleted)
     added_without_whitespaces = whitespaces.sub('', added)
     return deleted_without_whitspaces == added_without_whitespaces
@@ -66,31 +69,65 @@ def has_java_javadoc_changed(patch: str, linecontext: int = 3) -> Tuple[bool, bo
     going = False
     in_javadoc = False
     in_javadoc_tag_section = False
+    in_javadoc_end = False
+    tag_line = False
+    lookfor_code = False
+    lookfor_endtag = False
+    linecode_list = []
     for l, ln in zip(patchlines, itertools.count()):
+        in_javadoc_end = False
+        tag_line = False
+        if lookfor_code:
+            linecode_list.append(l)  
+            lines_ = "".join(linecode_list)
+            match = _function_headers.search(lines_)
+            if match:
+                for i in range(ln - len(linecode_list) + 1, ln+1):
+                    interesting_line_indices[i] = True
+                    lookfor_code = False
+            elif len(linecode_list) > 9:
+                lookfor_code = False
+                linecode_list = []
         if l.startswith('@@'):
             going = True
         elif l.startswith('--'):
             going = False
         elif going and not in_javadoc and _javadoc_start_marker.match(l):
             in_javadoc = True
-        elif going and in_javadoc and _javadoc_end_marker.match(l):
+        if going and in_javadoc and not in_javadoc_tag_section and _javadoc_section_marker.match(l):
+            tag_line = True
+            in_javadoc_tag_section = True
+            lookfor_code = False
+            lookfor_endtag = False
+            linecode_list = []
+        if going and in_javadoc and _javadoc_end_marker.match(l):
             in_javadoc = False
             in_javadoc_tag_section = False
-        elif  going and in_javadoc and not in_javadoc_tag_section and _javadoc_section_marker.match(l):
-            in_javadoc_tag_section = True
+            in_javadoc_end = True
+            if lookfor_endtag:
+                lookfor_endtag = False
+                lookfor_code = True
+                linecode_list = []
         if going and _patch_plus_minus_prefix.match(l):
             if _patch_plus_minus_asterisk_prefix.match(l):
                 continue
-            if in_javadoc_tag_section:
-                has_javadoc_tag_changed = True
+            if in_javadoc_tag_section or in_javadoc_end:
+                if in_javadoc_tag_section or in_javadoc_end and tag_line:
+                    has_javadoc_tag_changed = True
+                    interesting_line_indices[ln] = True
+                    #for zi in range(max(0, ln - linecontext), min(len(patchlines), ln + linecontext) + 1):
+                    #    interesting_line_indices[zi] = True
                 if _patch_minus_prefix.match(l):
                     tag_lines_before = tag_lines_before + l[2:]
                 elif _patch_plus_prefix.match(l):
                     tag_lines_after = tag_lines_after + l[2:]
+                if in_javadoc_tag_section:
+                    lookfor_endtag = True
+                elif tag_line:
+                    lookfor_code = True
+                    linecode_list = []
                 # has_javadoc_tag_diffplus |= _patch_plus_prefix.match(l)
                 # has_javadoc_tag_diffminus |= _patch_minus_prefix.match(l)
-                for zi in range(max(0, ln - linecontext), min(len(patchlines), ln + linecontext) + 1):
-                    interesting_line_indices[zi] = True
             elif in_javadoc:
                 has_javadoc_changed = True
                 if _patch_minus_prefix.match(l):
